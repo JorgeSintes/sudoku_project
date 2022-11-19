@@ -129,4 +129,6 @@ dmypy.json
 .pyre/
 
 img/*
+# include file
+!img/sudoku.jpeg
 weights/
