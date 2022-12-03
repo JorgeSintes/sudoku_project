@@ -49,7 +49,3 @@ if __name__ == "__main__":
     output = model(fake_input.to(device))
     print(output)
     print(model.inference(fake_input.to(device)))
-    model.load_weights("weights/sudokunet.pt")
-    output = model(fake_input.to(device))
-    print(output)
-    print(model.inference(fake_input.to(device)))

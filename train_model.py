@@ -6,19 +6,19 @@ import numpy as np
 from termcolor import colored
 from sklearn.metrics import accuracy_score
 
-from data import load_mnist
+from data import load_mnist, load_char74
 from model import SudokuNet
 from sudoku_io import show_image, get_sudoku_images
 
 class Trainer():
-    def __init__(self, log: logging.Logger, batch_size: int = 64):
+    def __init__(self, log: logging.Logger, dataset: str = "mnist", batch_size: int = 64):
         self.log = log
         self.batch_size = batch_size
 
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.log.info(f"Using {self.device}!")
 
-        self.create_data_loaders(dataset="mnist")
+        self.create_data_loaders(dataset=dataset)
 
         self.model = SudokuNet()
         self.model.to(self.device)
@@ -28,6 +28,8 @@ class Trainer():
     def create_data_loaders(self, dataset="mnist"):
         if dataset == "mnist":
             data_dict = load_mnist()
+        elif dataset == "char74":
+            data_dict = load_char74()
 
         X_train = data_dict["X_train"]
         y_train = data_dict["y_train"]
@@ -135,8 +137,8 @@ def make_logger():
 
 def example():
     log = make_logger()
-    trainer = Trainer(log=log, batch_size=64)
-    trainer.load_weights("weights/sudokunet.pt")
+    trainer = Trainer(log=log, dataset="char74", batch_size=64)
+    trainer.load_weights(os.path.join("weights", "sudokunet_char74.pt"))
     trainer.test()
     trainer.test_sudoku()
 
