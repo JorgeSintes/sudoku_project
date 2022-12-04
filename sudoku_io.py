@@ -49,18 +49,18 @@ def find_sudoku(raw_img: np.ndarray, final_fig_size: Optional[int] = 300) -> np.
 
     return final_img
 
-def get_sudoku_images(sudoku_path: str, img_size: Optional[int] = 28) -> np.ndarray:
+def get_sudoku_images(sudoku_path: str, img_size: Optional[int] = 28, threshold: Optional[float] = 0.3) -> np.ndarray:
     """
     Returns the 9x9 images of the sudoku grid in an array with shape(9,9,img_size,img_size)
     """
-    sudoku = np.zeros((9,9,img_size,img_size), dtype=np.uint8)
+    sudoku = np.zeros((9,9,img_size,img_size))
     raw_img = cv2.imread(sudoku_path)
     img = find_sudoku(raw_img, img_size*9)
     indeces = np.array(np.linspace(0, img_size*9, 10), dtype=int)
 
     for i in range(9):
         for j in range(9):
-            sudoku[i,j] = cv2.cvtColor(img[indeces[i]:indeces[i+1], indeces[j]:indeces[j+1]], cv2.COLOR_RGB2GRAY)
+            _, sudoku[i,j] = cv2.threshold(cv2.cvtColor(img[indeces[i]:indeces[i+1], indeces[j]:indeces[j+1]], cv2.COLOR_RGB2GRAY)/255, threshold, 1, cv2.THRESH_BINARY)
 
     return sudoku
 

@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import Optional
 
 import torch
 import numpy as np
@@ -11,16 +12,17 @@ from model import SudokuNet
 from sudoku_io import show_image, get_sudoku_images
 
 class Trainer():
-    def __init__(self, log: logging.Logger, dataset: str = "mnist", batch_size: int = 64):
+    def __init__(self, log: logging.Logger, dataset: str = "mnist", batch_size: int = 64, img_size: Optional[int] = 28):
         self.log = log
         self.batch_size = batch_size
+        self.img_size = img_size
 
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.log.info(f"Using {self.device}!")
 
         self.create_data_loaders(dataset=dataset)
 
-        self.model = SudokuNet()
+        self.model = SudokuNet(img_size=self.img_size)
         self.model.to(self.device)
         self.loss_fn = torch.nn.CrossEntropyLoss()
         self.loss_fn.to(self.device)
@@ -29,7 +31,7 @@ class Trainer():
         if dataset == "mnist":
             data_dict = load_mnist()
         elif dataset == "char74":
-            data_dict = load_char74()
+            data_dict = load_char74(img_size=self.img_size)
 
         X_train = data_dict["X_train"]
         y_train = data_dict["y_train"]
@@ -94,13 +96,16 @@ class Trainer():
         self.log.info(f"Test acc: {test_acc}")
     
     def test_sudoku(self, path=os.path.join("img", "sudoku.jpeg")):
-        sudoku_images = get_sudoku_images(path)
+        sudoku_images = get_sudoku_images(path, img_size=self.img_size)
         for i in range(9):
             for j in range(9):
-                digit_input = torch.Tensor(sudoku_images[i, j, :, :]/255).reshape(1,1,28,28)
+                digit_input = torch.Tensor(sudoku_images[i, j, :, :]).reshape(1,1,self.img_size,self.img_size)
                 prediction = self.model.inference(digit_input.to(self.device)).to("cpu")
                 self.log.info(f"Row {i}, Column {j}. Pred: {prediction[0]}")
                 show_image(sudoku_images[i,j,:,:])
+    
+    def test_char(self):
+        self.test_loader
     
     def save_weights(self, path):
         self.model.save_weights(path)
@@ -108,7 +113,6 @@ class Trainer():
     def load_weights(self, path):
         self.model.load_weights(path)
         
-
 
 class CustomFormatter(logging.Formatter):
     """Logging Formatter to add colors and count warning / errors
@@ -137,10 +141,12 @@ def make_logger():
 
 def example():
     log = make_logger()
-    trainer = Trainer(log=log, dataset="char74", batch_size=64)
-    trainer.load_weights(os.path.join("weights", "sudokunet_char74.pt"))
+    trainer = Trainer(log=log, dataset="char74", batch_size=64, img_size=32)
+    # trainer.load_weights(os.path.join("weights", "sudokunet_char74.pt"))
+    trainer.train(no_epochs=10)
     trainer.test()
     trainer.test_sudoku()
+    # trainer.save_weights(os.path.join("weights", "sudokunet_char74"))
 
 if __name__ == "__main__":
     example()

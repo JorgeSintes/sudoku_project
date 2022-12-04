@@ -1,4 +1,5 @@
 import os
+from typing import Dict,Optional
 
 import cv2
 import torch
@@ -6,7 +7,7 @@ import numpy as np
 
 from sudoku_io import show_image
 
-def load_mnist():
+def load_mnist() -> Dict[str, torch.Tensor]:
     if not os.path.exists(os.path.join("img", "mnist.npz")):
         os.system("wget -N https://www.dropbox.com/s/qxywaq7nx19z72p/mnist.npz")
         os.system("mv mnist.npz img/")
@@ -30,18 +31,15 @@ def load_mnist():
 
     return return_dict
 
-def load_char74():
-    if os.path.exists(os.path.join("img", "char74.npz")):
-        data = np.load(os.path.join("img", "char74.npz"))
-    else:
-        process_char74()
-        data = np.load(os.path.join("img", "char74.npz"))
+def load_char74(img_size: Optional[int] = 28) -> Dict[str, torch.Tensor]:
+    process_char74(img_size=img_size)
+    data = np.load(os.path.join("img", "char74.npz"))
 
-    X_train = torch.tensor(data["X_train"]).reshape(-1,1,28,28)
+    X_train = torch.tensor(data["X_train"]).reshape(-1,1,img_size,img_size)
     y_train = torch.tensor(data["y_train"])
-    X_valid = torch.tensor(data["X_valid"]).reshape(-1,1,28,28)
+    X_valid = torch.tensor(data["X_valid"]).reshape(-1,1,img_size,img_size)
     y_valid = torch.tensor(data["y_valid"])
-    X_test = torch.tensor(data["X_test"]).reshape(-1,1,28,28)
+    X_test = torch.tensor(data["X_test"]).reshape(-1,1,img_size,img_size)
     y_test = torch.tensor(data["y_test"])
 
     return_dict = {
@@ -55,18 +53,18 @@ def load_char74():
 
     return return_dict
 
-def process_char74():
+def process_char74(img_size: Optional[int] = 28):
     sample_dirs = os.listdir(os.path.join("img", "char74_raw", "Fnt"))
     sample_dirs.sort()
 
-    X = np.zeros((10160, 1, 28, 28), dtype=np.float32)
+    X = np.zeros((10160, 1, img_size, img_size), dtype=np.float32)
     y = np.zeros((10160,), dtype=np.uint8)
 
     for i, sample_dir in enumerate(sample_dirs[:10]):
         images = os.listdir(os.path.join('img', 'char74_raw', 'Fnt', sample_dir))
         for j, image in enumerate(images):
             img = cv2.imread(os.path.join('img', 'char74_raw', 'Fnt', sample_dir, image), 0)
-            img = cv2.resize(img, (28,28))
+            img = cv2.resize(img, (img_size,img_size))
             X[i*1016+j, 0, :, :] = img/255
             y[i*1016+j] = i
     
