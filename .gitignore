@@ -131,3 +131,7 @@ dmypy.json
 img/*
 !img/sudoku.jpeg
 weights/
+
+MNIST/
+mlruns/
+mlartifacts/

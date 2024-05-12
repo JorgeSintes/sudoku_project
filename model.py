@@ -1,30 +1,33 @@
 import os
 import torch
 
+
 class PrintSize(torch.nn.Module):
     def __init__(self):
         super(PrintSize, self).__init__()
+
     def forward(self, x):
         print(x.shape)
 
+
 class SudokuNet(torch.nn.Module):
-    def __init__(self, img_size = 28):
+    def __init__(self, img_size=28):
         super(SudokuNet, self).__init__()
         self.net = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, padding=2),
             torch.nn.MaxPool2d(2, stride=2),
             torch.nn.Flatten(),
-            torch.nn.Linear(int(32*img_size*img_size/4),2048),
+            torch.nn.Linear(int(32 * img_size * img_size / 4), 2048),
             torch.nn.ReLU(),
-            torch.nn.Linear(2048,128),
+            torch.nn.Linear(2048, 128),
             torch.nn.ReLU(),
-            torch.nn.Linear(128,10),
-            torch.nn.Softmax(dim=1)
+            torch.nn.Linear(128, 10),
+            torch.nn.Softmax(dim=1),
         )
 
     def forward(self, x):
         return self.net(x)
-    
+
     def inference(self, x):
         output = self.net(x)
         return output.max(1)[1]
@@ -45,7 +48,7 @@ if __name__ == "__main__":
     model = SudokuNet()
     model.to(device)
     print(model)
-    fake_input = torch.randn((2,1,28,28))
+    fake_input = torch.randn((2, 1, 28, 28))
     output = model(fake_input.to(device))
     print(output)
     print(model.inference(fake_input.to(device)))
