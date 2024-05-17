@@ -1,113 +1,97 @@
+from dataclasses import dataclass
 import os
+from pathlib import Path
 from typing import Sequence
 
 import cv2
+import matplotlib.pyplot as plt
 import torch
-from torch.utils.data import Dataset, DataLoader, ConcatDataset
 import torchvision
-import numpy as np
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, TensorDataset
 
-# def load_mnist() -> dict[str, torch.Tensor]:
-#     mnist_train = torchvision.datasets.MNIST("./", train=True, download=True)
-#     mnist_test = torchvision.datasets.MNIST("./", train=False, download=True)
-#
-#     return_dict = {
-#         "X_train": mnist_train.data.reshape((-1, 1, 28, 28)),
-#         "y_train": mnist_train.targets,
-#         "X_test": mnist_test.data.reshape((-1, 1, 28, 28)),
-#         "y_test": mnist_test.targets,
-#     }
-#
-#     return return_dict
-#
 
-def load_mnist(train: bool = True) -> Dataset:
-    transform = torchvision.transforms.Compose([
-        torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize((0.5,), (0.5,))
-    ])
-    ds = torchvision.datasets.MNIST("./", train=train, download=True, transform=transform)
+@dataclass
+class DataConfig:
+    dataset_base_path: Path = Path(__file__).parent / "dataset"
+    img_size: int = 28
+    use_mnist: bool = True
+    use_char74: bool = True
+
+
+def load_mnist(cfg: DataConfig, train: bool = True) -> Dataset:
+    cfg.dataset_base_path.mkdir(exist_ok=True)
+    transform = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.5,), (0.5,)),
+        ]
+    )
+    ds = torchvision.datasets.MNIST(
+        cfg.dataset_base_path.as_posix(), train=train, download=True, transform=transform
+    )
     return ds
 
-def load_char74(img_size: int = 28) -> dict[str, torch.Tensor]:
-    process_char74(img_size=img_size)
-    data = np.load(os.path.join("img", "char74.npz"))
 
-    X_train = torch.tensor(data["X_train"]).reshape(-1, 1, img_size, img_size)
-    y_train = torch.tensor(data["y_train"])
-    X_valid = torch.tensor(data["X_valid"]).reshape(-1, 1, img_size, img_size)
-    y_valid = torch.tensor(data["y_valid"])
-    X_test = torch.tensor(data["X_test"]).reshape(-1, 1, img_size, img_size)
-    y_test = torch.tensor(data["y_test"])
-
-    return_dict = {
-        "X_train": X_train,
-        "y_train": y_train,
-        "X_valid": X_valid,
-        "y_valid": y_valid,
-        "X_test": X_test,
-        "y_test": y_test,
-    }
-
-    return return_dict
-
-
-def process_char74(img_size: int = 28):
-    sample_dirs = os.listdir(os.path.join("img", "char74_raw", "Fnt"))
-    sample_dirs.sort()
-
-    X = np.zeros((10160, 1, img_size, img_size), dtype=np.float32)
-    y = np.zeros((10160,), dtype=np.uint8)
-
-    for i, sample_dir in enumerate(sample_dirs[:10]):
-        images = os.listdir(os.path.join("img", "char74_raw", "Fnt", sample_dir))
-        for j, image in enumerate(images):
-            img = cv2.imread(
-                os.path.join("img", "char74_raw", "Fnt", sample_dir, image), 0
+def get_char74(cfg: DataConfig):
+    dataset_path = cfg.dataset_base_path / "char74"
+    dataset_path.mkdir(exist_ok=True)
+    for file in ["EnglishImg.tgz", "EnglishHnd.tgz", "EnglishFnt.tgz"]:
+        if not (dataset_path / "English" / file[7:10]).exists():
+            os.system(
+                f"wget -P {dataset_path.as_posix()} https://info-ee.surrey.ac.uk/CVSSP/demos/chars74k/{file}"
             )
-            img = cv2.resize(img, (img_size, img_size))
-            X[i * 1016 + j, 0, :, :] = img / 255
-            y[i * 1016 + j] = i
+            os.system(f"tar -xvzf {dataset_path.as_posix()}/{file} -C {dataset_path.as_posix()}")
+            os.system(f"rm {dataset_path.as_posix()}/{file}")
 
-    X_train = []
-    X_valid = []
-    X_test = []
-    y_train = []
-    y_valid = []
-    y_test = []
+
+def process_char74(cfg: DataConfig):
+    fnt_path = cfg.dataset_base_path / "char74" / "English" / "Fnt"
+    if not fnt_path.exists():
+        get_char74(cfg)
+
+    total_images = 0
+    for i in range(1, 11):
+        total_images += len(list((fnt_path / f"Sample{i:03}").glob("*.png")))
+
+    X = torch.zeros(total_images, 1, cfg.img_size, cfg.img_size, dtype=torch.float32)
+    y = torch.zeros(total_images, dtype=torch.uint8)
 
     for i in range(10):
-        images = X[i * 1016 : (i + 1) * 1016, :, :, :]
-        labels = y[i * 1016 : (i + 1) * 1016]
+        for j, img_path in enumerate(sorted((fnt_path / f"Sample{i+1:03}").iterdir())):
+            img = cv2.imread(img_path.as_posix(), 0)
+            img = cv2.resize(img, (cfg.img_size, cfg.img_size))
+            img = torch.from_numpy(img).type(torch.float32)
+            X[i * 1016 + j, 0, :, :] = img / 255 * 2 - 1
+            y[i * 1016 + j] = i
 
-        X_train.append(images[:725, :, :, :])
-        X_valid.append(images[725:870, :, :, :])
-        X_test.append(images[870:, :, :, :])
-        y_train.append(labels[:725])
-        y_valid.append(labels[725:870])
-        y_test.append(labels[870:])
+    torch.save(TensorDataset(X, y), cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
 
-    X_train = np.concatenate(X_train, axis=0)
-    X_valid = np.concatenate(X_valid, axis=0)
-    X_test = np.concatenate(X_test, axis=0)
-    y_train = np.concatenate(y_train, axis=0)
-    y_valid = np.concatenate(y_valid, axis=0)
-    y_test = np.concatenate(y_test, axis=0)
 
-    save_dict = {
-        "X_train": X_train,
-        "X_valid": X_valid,
-        "X_test": X_test,
-        "y_train": y_train,
-        "y_valid": y_valid,
-        "y_test": y_test,
-    }
+def load_char74(cfg: DataConfig, train: bool = True) -> Dataset:
+    if not (cfg.dataset_base_path / f"char74_{cfg.img_size}.pt").exists():
+        process_char74(cfg)
 
-    np.savez(os.path.join("img", "char74.npz"), **save_dict)
+    return torch.load(cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
 
-def create_data_loaders(datasets: Sequence[Dataset], batch_size: int, shuffle: bool) -> DataLoader:
+
+def load_data(cfg: DataConfig, train: bool = True) -> Sequence[Dataset]:
+    datasets = []
+    if cfg.use_mnist:
+        datasets.append(load_mnist(cfg, train))
+    if cfg.use_char74:
+        datasets.append(load_char74(cfg, train))
+    return datasets
+
+
+def create_data_loader(datasets: Sequence[Dataset], batch_size: int, shuffle: bool) -> DataLoader:
     sets = ConcatDataset(datasets)
     return DataLoader(sets, batch_size=batch_size, shuffle=shuffle)
 
-if __name__ == "__main__":
-    load_mnist(train=True)
+
+def viz_data(dl: DataLoader, batch_size: int = 5):
+    fig, axs = plt.subplots(batch_size, 1, figsize=(12, 6))
+    X, y = next(iter(dl))
+    for i, (img, label) in enumerate(zip(X, y)):
+        axs[i].title(label)
+        axs[i].imshow(img.numpy().transpose((1, 2, 0)))
+    plt.show()
