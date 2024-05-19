@@ -1,3 +1,4 @@
+import enum
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,12 +11,35 @@ import torchvision
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, TensorDataset
 
 
+class Char74Type(enum.Enum):
+    FNT = "Fnt"
+    HND = "Hnd"
+    GOOD = "GoodImg"
+    BAD = "BadImg"
+
+    def __str__(self):
+        return self.value
+
+    def get_path(self, base_path: Path) -> Path:
+        if self == Char74Type.FNT:
+            return base_path / "char74" / "English" / "Fnt"
+        elif self == Char74Type.HND:
+            return base_path / "char74" / "English" / "Hnd" / "Img"
+        elif self == Char74Type.GOOD:
+            return base_path / "char74" / "English" / "Img" / "GoodImg" / "Bmp"
+        elif self == Char74Type.BAD:
+            return base_path / "char74" / "English" / "Img" / "BadImg" / "Bmp"
+
+        raise NotImplementedError(f"Unknown type {self}")
+
+
 @dataclass
 class DataConfig:
     dataset_base_path: Path = Path(__file__).parent / "dataset"
     img_size: int = 28
     use_mnist: bool = True
     use_char74: bool = True
+    char74_types: Sequence[Char74Type] = (Char74Type.FNT, Char74Type.HND, Char74Type.GOOD, Char74Type.BAD)
 
 
 def load_mnist(cfg: DataConfig, train: bool = True) -> Dataset:
@@ -44,54 +68,57 @@ def get_char74(cfg: DataConfig):
             os.system(f"rm {dataset_path.as_posix()}/{file}")
 
 
-def process_char74(cfg: DataConfig):
-    fnt_path = cfg.dataset_base_path / "char74" / "English" / "Fnt"
-    if not fnt_path.exists():
-        get_char74(cfg)
+def process_char74(cfg: DataConfig) -> Dataset:
+    paths = [ds_type.get_path(cfg.dataset_base_path) for ds_type in cfg.char74_types]
+
+    for path in paths:
+        if not path.exists():
+            get_char74(cfg)
 
     total_images = 0
     for i in range(1, 11):
-        total_images += len(list((fnt_path / f"Sample{i:03}").glob("*.png")))
+        for path in paths:
+            total_images += len(list((path / f"Sample{i:03}").glob("*.png")))
 
     X = torch.zeros(total_images, 1, cfg.img_size, cfg.img_size, dtype=torch.float32)
     y = torch.zeros(total_images, dtype=torch.uint8)
 
+    idx = 0
     for i in range(10):
-        for j, img_path in enumerate(sorted((fnt_path / f"Sample{i+1:03}").iterdir())):
-            img = cv2.imread(img_path.as_posix(), 0)
-            img = cv2.resize(img, (cfg.img_size, cfg.img_size))
-            img = torch.from_numpy(img).type(torch.float32)
-            X[i * 1016 + j, 0, :, :] = img / 255 * 2 - 1
-            y[i * 1016 + j] = i
+        for path in paths:
+            for img_path in sorted((path / f"Sample{i+1:03}").iterdir()):
+                img = cv2.imread(img_path.as_posix(), cv2.IMREAD_GRAYSCALE)
+                img = cv2.resize(img, (cfg.img_size, cfg.img_size))
+                img = torch.from_numpy(img).type(torch.float32)
+                X[idx, 0, :, :] = img / 255 * 2 - 1
+                y[idx] = i
+                idx += 1
 
-    torch.save(TensorDataset(X, y), cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
+    # torch.save(TensorDataset(X, y), cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
+    return TensorDataset(X, y)
 
 
 def load_char74(cfg: DataConfig, train: bool = True) -> Dataset:
     if not (cfg.dataset_base_path / f"char74_{cfg.img_size}.pt").exists():
-        process_char74(cfg)
+        return process_char74(cfg)
 
     return torch.load(cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
 
 
-def load_data(cfg: DataConfig, train: bool = True) -> Sequence[Dataset]:
+def load_data(cfg: DataConfig, train: bool = True) -> Dataset:
     datasets = []
     if cfg.use_mnist:
         datasets.append(load_mnist(cfg, train))
     if cfg.use_char74:
         datasets.append(load_char74(cfg, train))
-    return datasets
+    return ConcatDataset(datasets)
 
 
-def create_data_loader(datasets: Sequence[Dataset], batch_size: int, shuffle: bool) -> DataLoader:
-    sets = ConcatDataset(datasets)
-    return DataLoader(sets, batch_size=batch_size, shuffle=shuffle)
-
-
-def viz_data(dl: DataLoader, batch_size: int = 5):
-    fig, axs = plt.subplots(batch_size, 1, figsize=(12, 6))
+def viz_data(dl: DataLoader):
     X, y = next(iter(dl))
+    batch_size = X.shape[0]
+    fig, axs = plt.subplots(batch_size, 1, figsize=(12, 6))
     for i, (img, label) in enumerate(zip(X, y)):
-        axs[i].title(label)
+        axs[i].set_title(f"Label: {label.item()}")
         axs[i].imshow(img.numpy().transpose((1, 2, 0)))
     plt.show()
