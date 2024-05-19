@@ -12,14 +12,15 @@ class PrintSize(torch.nn.Module):
         print(x.shape)
 
 
-class BaseLine(torch.nn.Module):
+class Baseline(torch.nn.Module):
     @dataclass
     class Config:
         img_size: int = 28
 
     def __init__(self, cfg: Config):
-        super(BaseLine, self).__init__()
+        super(Baseline, self).__init__()
         self.cfg = cfg
+        self.model_name = "baseline"
         self.net = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, padding=2),
             torch.nn.MaxPool2d(2, stride=2),
@@ -62,6 +63,7 @@ class DCNN(torch.nn.Module):
     def __init__(self, cfg: Config):
         super(DCNN, self).__init__()
         self.cfg = cfg
+        self.model_name = "dcnn"
         self.net = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1, stride=1),
             torch.nn.ReLU(),

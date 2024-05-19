@@ -8,7 +8,7 @@ import cv2
 import matplotlib.pyplot as plt
 import torch
 import torchvision
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, TensorDataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, TensorDataset, random_split
 
 
 class Char74Type(enum.Enum):
@@ -39,7 +39,10 @@ class DataConfig:
     img_size: int = 28
     use_mnist: bool = True
     use_char74: bool = True
+    char74_cached_data: bool = False
     char74_types: Sequence[Char74Type] = (Char74Type.FNT, Char74Type.HND, Char74Type.GOOD, Char74Type.BAD)
+    char74_ds_split: float = 0.8
+    seed: int = 42
 
 
 def load_mnist(cfg: DataConfig, train: bool = True) -> Dataset:
@@ -81,7 +84,7 @@ def process_char74(cfg: DataConfig) -> Dataset:
             total_images += len(list((path / f"Sample{i:03}").glob("*.png")))
 
     X = torch.zeros(total_images, 1, cfg.img_size, cfg.img_size, dtype=torch.float32)
-    y = torch.zeros(total_images, dtype=torch.uint8)
+    y = torch.zeros(total_images, dtype=torch.int64)
 
     idx = 0
     for i in range(10):
@@ -94,15 +97,25 @@ def process_char74(cfg: DataConfig) -> Dataset:
                 y[idx] = i
                 idx += 1
 
-    # torch.save(TensorDataset(X, y), cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
+    if cfg.char74_cached_data:
+        torch.save(TensorDataset(X, y), cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
     return TensorDataset(X, y)
 
 
 def load_char74(cfg: DataConfig, train: bool = True) -> Dataset:
-    if (cfg.dataset_base_path / f"char74_{cfg.img_size}.pt").exists():
-        return torch.load(cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
+    if cfg.char74_cached_data and (cfg.dataset_base_path / f"char74_{cfg.img_size}.pt").exists():
+        ds = torch.load(cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
+    else:
+        ds = process_char74(cfg)
 
-    return process_char74(cfg)
+    train_size = int(len(ds) * cfg.char74_ds_split)
+    test_size = len(ds) - train_size
+    train_ds, test_ds = random_split(
+        ds, [train_size, test_size], generator=torch.Generator().manual_seed(cfg.seed)
+    )
+    if train:
+        return train_ds
+    return test_ds
 
 
 def load_data(cfg: DataConfig, train: bool = True) -> Dataset:

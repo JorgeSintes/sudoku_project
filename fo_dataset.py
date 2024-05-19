@@ -22,7 +22,6 @@ class Char74DatasetImporter(foud.LabeledImageDatasetImporter):
         shuffle=False,
         seed=None,
         max_samples=None,
-        **kwargs,
     ):
         super().__init__(
             dataset_dir=cfg.dataset_base_path,
@@ -54,22 +53,6 @@ class Char74DatasetImporter(foud.LabeledImageDatasetImporter):
         return len(self.images)
 
     def __next__(self):
-        """Returns information about the next sample in the dataset.
-
-        Returns:
-            an  ``(image_path, image_metadata, label)`` tuple, where
-
-            -   ``image_path``: the path to the image on disk
-            -   ``image_metadata``: an
-                :class:`fiftyone.core.metadata.ImageMetadata` instances for the
-                image, or ``None`` if :meth:`has_image_metadata` is ``False``
-            -   ``label``: an instance of :meth:`label_cls`, or a dictionary
-                mapping field names to :class:`fiftyone.core.labels.Label`
-                instances, or ``None`` if the sample is unlabeled
-
-        Raises:
-            StopIteration: if there are no more samples to import
-        """
         if self.no_samples == self.max_samples:
             raise StopIteration
 
@@ -87,38 +70,14 @@ class Char74DatasetImporter(foud.LabeledImageDatasetImporter):
 
     @property
     def has_dataset_info(self):
-        """Whether this importer produces a dataset info dictionary."""
-        # Return True or False here
         return False
 
     @property
     def has_image_metadata(self):
-        """Whether this importer produces
-        :class:`fiftyone.core.metadata.ImageMetadata` instances for each image.
-        """
-        # Return True or False here
         return True
 
     @property
     def label_cls(self):
-        """The :class:`fiftyone.core.labels.Label` class(es) returned by this
-        importer.
-
-        This can be any of the following:
-
-        -   a :class:`fiftyone.core.labels.Label` class. In this case, the
-            importer is guaranteed to return labels of this type
-        -   a list or tuple of :class:`fiftyone.core.labels.Label` classes. In
-            this case, the importer can produce a single label field of any of
-            these types
-        -   a dict mapping keys to :class:`fiftyone.core.labels.Label` classes.
-            In this case, the importer will return label dictionaries with keys
-            and value-types specified by this dictionary. Not all keys need be
-            present in the imported labels
-        -   ``None``. In this case, the importer makes no guarantees about the
-            labels that it may return
-        """
-        # Return the appropriate value here
         return {
             "filepath": fo.StringField,
             "ground_truth": fo.StringField,
@@ -137,11 +96,12 @@ if __name__ == "__main__":
                 char74_types=(Char74Type.FNT, Char74Type.HND, Char74Type.GOOD, Char74Type.BAD),
             ),
             seed=42,
+            shuffle=True,
         )
         char74_ds = fo.Dataset.from_importer(char74_importer, "char74", persistent=True)
     if "mnist" not in available_datasets:
         mnist_ds = foz.load_zoo_dataset(
-            "mnist", dataset_dir=Path(__file__).parent / "dataset" / "MNIST", persistent=True
+            "mnist", dataset_dir=Path(__file__).parent / "dataset" / "mnist", persistent=True
         )
     session = fo.launch_app(address="0.0.0.0", port=5151)
     session.wait()

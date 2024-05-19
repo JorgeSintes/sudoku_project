@@ -1,6 +1,10 @@
-mlflow==2.12.1
+fiftyone==0.23.8
+fiftyone_db==1.1.2
+matplotlib==3.9.0
+mlflow==2.12.2
 numpy==1.26.4
 opencv_python==4.9.0.80
+opencv_python_headless==4.9.0.80
 scikit_learn==1.4.2
-torch==2.3.0+cpu
-torchvision==0.18.0+cpu
+torch==2.3.0
+torchvision==0.18.0
