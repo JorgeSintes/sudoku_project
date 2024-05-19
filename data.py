@@ -28,7 +28,7 @@ class Char74Type(enum.Enum):
         elif self == Char74Type.GOOD:
             return base_path / "char74" / "English" / "Img" / "GoodImg" / "Bmp"
         elif self == Char74Type.BAD:
-            return base_path / "char74" / "English" / "Img" / "BadImg" / "Bmp"
+            return base_path / "char74" / "English" / "Img" / "BadImag" / "Bmp"
 
         raise NotImplementedError(f"Unknown type {self}")
 
@@ -47,7 +47,7 @@ def load_mnist(cfg: DataConfig, train: bool = True) -> Dataset:
     transform = torchvision.transforms.Compose(
         [
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.5,), (0.5,)),
+            torchvision.transforms.Lambda(lambda x: -x),
         ]
     )
     ds = torchvision.datasets.MNIST(
@@ -99,10 +99,10 @@ def process_char74(cfg: DataConfig) -> Dataset:
 
 
 def load_char74(cfg: DataConfig, train: bool = True) -> Dataset:
-    if not (cfg.dataset_base_path / f"char74_{cfg.img_size}.pt").exists():
-        return process_char74(cfg)
+    if (cfg.dataset_base_path / f"char74_{cfg.img_size}.pt").exists():
+        return torch.load(cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
 
-    return torch.load(cfg.dataset_base_path / f"char74_{cfg.img_size}.pt")
+    return process_char74(cfg)
 
 
 def load_data(cfg: DataConfig, train: bool = True) -> Dataset:
